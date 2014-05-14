@@ -27,7 +27,7 @@ class ChoiceFormField extends FormField
      */
     private $type;
     /**
-     * @var Boolean
+     * @var bool
      */
     private $multiple;
     /**
@@ -38,7 +38,7 @@ class ChoiceFormField extends FormField
     /**
      * Returns true if the field should be included in the submitted values.
      *
-     * @return Boolean true if the field should be included in the submitted values, false otherwise
+     * @return bool    true if the field should be included in the submitted values, false otherwise
      */
     public function hasValue()
     {
@@ -53,7 +53,7 @@ class ChoiceFormField extends FormField
     /**
      * Check if the current selected option is disabled
      *
-     * @return Boolean
+     * @return bool
      */
     public function isDisabled()
     {
@@ -188,7 +188,7 @@ class ChoiceFormField extends FormField
     /**
      * Returns true if the field accepts multiple values.
      *
-     * @return Boolean true if the field accepts multiple values, false otherwise
+     * @return bool    true if the field accepts multiple values, false otherwise
      */
     public function isMultiple()
     {
@@ -206,7 +206,7 @@ class ChoiceFormField extends FormField
             throw new \LogicException(sprintf('A ChoiceFormField can only be created from an input or select tag (%s given).', $this->node->nodeName));
         }
 
-        if ('input' == $this->node->nodeName && 'checkbox' != $this->node->getAttribute('type') && 'radio' != $this->node->getAttribute('type')) {
+        if ('input' == $this->node->nodeName && 'checkbox' != strtolower($this->node->getAttribute('type')) && 'radio' != strtolower($this->node->getAttribute('type'))) {
             throw new \LogicException(sprintf('A ChoiceFormField can only be created from an input tag with a type of checkbox or radio (given type is %s).', $this->node->getAttribute('type')));
         }
 
@@ -215,7 +215,7 @@ class ChoiceFormField extends FormField
         $this->multiple = false;
 
         if ('input' == $this->node->nodeName) {
-            $this->type = $this->node->getAttribute('type');
+            $this->type = strtolower($this->node->getAttribute('type'));
             $optionValue = $this->buildOptionValue($this->node);
             $this->options[] = $optionValue;
 

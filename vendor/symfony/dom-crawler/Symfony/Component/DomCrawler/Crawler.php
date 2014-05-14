@@ -97,7 +97,7 @@ class Crawler extends \SplObjectStorage
 
         // DOM only for HTML/XML content
         if (!preg_match('/(x|ht)ml/i', $type, $xmlMatches)) {
-            return null;
+            return;
         }
 
         $charset = null;
@@ -141,7 +141,7 @@ class Crawler extends \SplObjectStorage
      */
     public function addHtmlContent($content, $charset = 'UTF-8')
     {
-        $current = libxml_use_internal_errors(true);
+        $internalErrors = libxml_use_internal_errors(true);
         $disableEntities = libxml_disable_entity_loader(true);
 
         $dom = new \DOMDocument('1.0', $charset);
@@ -161,9 +161,11 @@ class Crawler extends \SplObjectStorage
             }
         }
 
-        @$dom->loadHTML($content);
+        if ('' !== trim($content)) {
+            @$dom->loadHTML($content);
+        }
 
-        libxml_use_internal_errors($current);
+        libxml_use_internal_errors($internalErrors);
         libxml_disable_entity_loader($disableEntities);
 
         $this->addDocument($dom);
@@ -200,16 +202,18 @@ class Crawler extends \SplObjectStorage
      */
     public function addXmlContent($content, $charset = 'UTF-8')
     {
-        $current = libxml_use_internal_errors(true);
+        $internalErrors = libxml_use_internal_errors(true);
         $disableEntities = libxml_disable_entity_loader(true);
 
         $dom = new \DOMDocument('1.0', $charset);
         $dom->validateOnParse = true;
 
-        // remove the default namespace to make XPath expressions simpler
-        @$dom->loadXML(str_replace('xmlns', 'ns', $content), LIBXML_NONET);
+        if ('' !== trim($content)) {
+            // remove the default namespace to make XPath expressions simpler
+            @$dom->loadXML(str_replace('xmlns', 'ns', $content), LIBXML_NONET);
+        }
 
-        libxml_use_internal_errors($current);
+        libxml_use_internal_errors($internalErrors);
         libxml_disable_entity_loader($disableEntities);
 
         $this->addDocument($dom);
@@ -276,7 +280,7 @@ class Crawler extends \SplObjectStorage
     /**
      * Returns a node given its position in the node list.
      *
-     * @param integer $position The position
+     * @param int     $position The position
      *
      * @return Crawler A new instance of the Crawler with the selected node, or an empty Crawler if it does not exist.
      *
@@ -647,8 +651,9 @@ class Crawler extends \SplObjectStorage
      */
     public function selectButton($value)
     {
-        $xpath = sprintf('//input[((@type="submit" or @type="button") and contains(concat(\' \', normalize-space(string(@value)), \' \'), %s)) ', static::xpathLiteral(' '.$value.' ')).
-                         sprintf('or (@type="image" and contains(concat(\' \', normalize-space(string(@alt)), \' \'), %s)) or @id="%s" or @name="%s"] ', static::xpathLiteral(' '.$value.' '), $value, $value).
+        $translate = 'translate(@type, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")';
+        $xpath = sprintf('//input[((contains(%s, "submit") or contains(%s, "button")) and contains(concat(\' \', normalize-space(string(@value)), \' \'), %s)) ', $translate, $translate, static::xpathLiteral(' '.$value.' ')).
+                         sprintf('or (contains(%s, "image") and contains(concat(\' \', normalize-space(string(@alt)), \' \'), %s)) or @id="%s" or @name="%s"] ', $translate, static::xpathLiteral(' '.$value.' '), $value, $value).
                          sprintf('| //button[contains(concat(\' \', normalize-space(string(.)), \' \'), %s) or @id="%s" or @name="%s"]', static::xpathLiteral(' '.$value.' '), $value, $value);
 
         return $this->filterXPath($xpath);
@@ -768,7 +773,7 @@ class Crawler extends \SplObjectStorage
     }
 
     /**
-     * @param integer $position
+     * @param int     $position
      *
      * @return \DOMElement|null
      */
@@ -780,8 +785,6 @@ class Crawler extends \SplObjectStorage
             }
         // @codeCoverageIgnoreStart
         }
-
-        return null;
         // @codeCoverageIgnoreEnd
     }
 

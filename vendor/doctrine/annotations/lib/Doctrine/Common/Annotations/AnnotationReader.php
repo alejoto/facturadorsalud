@@ -21,7 +21,6 @@ namespace Doctrine\Common\Annotations;
 
 use Doctrine\Common\Annotations\Annotation\IgnoreAnnotation;
 use Doctrine\Common\Annotations\Annotation\Target;
-use Closure;
 use ReflectionClass;
 use ReflectionMethod;
 use ReflectionProperty;
@@ -112,21 +111,21 @@ class AnnotationReader implements Reader
     }
 
     /**
-     * Annotations Parser
+     * Annotations parser.
      *
      * @var \Doctrine\Common\Annotations\DocParser
      */
     private $parser;
 
     /**
-     * Annotations Parser used to collect parsing metadata
+     * Annotations parser used to collect parsing metadata.
      *
      * @var \Doctrine\Common\Annotations\DocParser
      */
     private $preParser;
 
     /**
-     * PHP Parser used to collect imports.
+     * PHP parser used to collect imports.
      *
      * @var \Doctrine\Common\Annotations\PhpParser
      */
@@ -173,30 +172,19 @@ class AnnotationReader implements Reader
     }
 
     /**
-     * Gets the annotations applied to a class.
-     *
-     * @param \ReflectionClass $class The ReflectionClass of the class from which
-     *                                the class annotations should be read.
-     *
-     * @return array An array of Annotations.
+     * {@inheritDoc}
      */
     public function getClassAnnotations(ReflectionClass $class)
     {
         $this->parser->setTarget(Target::TARGET_CLASS);
-        $this->parser->setImports($this->getImports($class));
+        $this->parser->setImports($this->getClassImports($class));
         $this->parser->setIgnoredAnnotationNames($this->getIgnoredAnnotationNames($class));
 
         return $this->parser->parse($class->getDocComment(), 'class ' . $class->getName());
     }
 
     /**
-     * Gets a class annotation.
-     *
-     * @param \ReflectionClass $class          The ReflectionClass of the class from which
-     *                                         the class annotations should be read.
-     * @param string           $annotationName The name of the annotation.
-     *
-     * @return mixed The Annotation or NULL, if the requested annotation does not exist.
+     * {@inheritDoc}
      */
     public function getClassAnnotation(ReflectionClass $class, $annotationName)
     {
@@ -212,12 +200,7 @@ class AnnotationReader implements Reader
     }
 
     /**
-     * Gets the annotations applied to a property.
-     *
-     * @param \ReflectionProperty $property The ReflectionProperty of the property
-     *                                      from which the annotations should be read.
-     *
-     * @return array An array of Annotations.
+     * {@inheritDoc}
      */
     public function getPropertyAnnotations(ReflectionProperty $property)
     {
@@ -225,19 +208,14 @@ class AnnotationReader implements Reader
         $context = 'property ' . $class->getName() . "::\$" . $property->getName();
 
         $this->parser->setTarget(Target::TARGET_PROPERTY);
-        $this->parser->setImports($this->getImports($class));
+        $this->parser->setImports($this->getPropertyImports($property));
         $this->parser->setIgnoredAnnotationNames($this->getIgnoredAnnotationNames($class));
 
         return $this->parser->parse($property->getDocComment(), $context);
     }
 
     /**
-     * Gets a property annotation.
-     *
-     * @param \ReflectionProperty $property
-     * @param string              $annotationName The name of the annotation.
-     *
-     * @return mixed The Annotation or NULL, if the requested annotation does not exist.
+     * {@inheritDoc}
      */
     public function getPropertyAnnotation(ReflectionProperty $property, $annotationName)
     {
@@ -253,12 +231,7 @@ class AnnotationReader implements Reader
     }
 
     /**
-     * Gets the annotations applied to a method.
-     *
-     * @param \ReflectionMethod $method The ReflectionMethod of the method from which
-     *                                  the annotations should be read.
-     *
-     * @return array An array of Annotations.
+     * {@inheritDoc}
      */
     public function getMethodAnnotations(ReflectionMethod $method)
     {
@@ -266,19 +239,14 @@ class AnnotationReader implements Reader
         $context = 'method ' . $class->getName() . '::' . $method->getName() . '()';
 
         $this->parser->setTarget(Target::TARGET_METHOD);
-        $this->parser->setImports($this->getImports($class));
+        $this->parser->setImports($this->getMethodImports($method));
         $this->parser->setIgnoredAnnotationNames($this->getIgnoredAnnotationNames($class));
 
         return $this->parser->parse($method->getDocComment(), $context);
     }
 
     /**
-     * Gets a method annotation.
-     *
-     * @param \ReflectionMethod $method
-     * @param string            $annotationName The name of the annotation.
-     *
-     * @return mixed The Annotation or NULL, if the requested annotation does not exist.
+     * {@inheritDoc}
      */
     public function getMethodAnnotation(ReflectionMethod $method, $annotationName)
     {
@@ -312,13 +280,13 @@ class AnnotationReader implements Reader
     }
 
     /**
-     * Retrieve imports
+     * Retrieves imports.
      *
      * @param \ReflectionClass $class
      *
      * @return array
      */
-    private function getImports(ReflectionClass $class)
+    private function getClassImports(ReflectionClass $class)
     {
         if (isset($this->imports[$name = $class->getName()])) {
             return $this->imports[$name];
@@ -330,7 +298,61 @@ class AnnotationReader implements Reader
     }
 
     /**
-     * Collects parsing metadata for a given class
+     * Retrieves imports for methods.
+     *
+     * @param \ReflectionMethod $method
+     *
+     * @return array
+     */
+    private function getMethodImports(ReflectionMethod $method)
+    {
+        $class = $method->getDeclaringClass();
+        $classImports = $this->getClassImports($class);
+        if (!method_exists($class, 'getTraits')) {
+            return $classImports;
+        }
+
+        $traitImports = array();
+
+        foreach ($class->getTraits() as $trait) {
+            if ($trait->hasMethod($method->getName())
+                && $trait->getFileName() === $method->getFileName()
+            ) {
+                $traitImports = array_merge($traitImports, $this->phpParser->parseClass($trait));
+            }
+        }
+
+        return array_merge($classImports, $traitImports);
+    }
+
+    /**
+     * Retrieves imports for properties.
+     *
+     * @param \ReflectionProperty $property
+     *
+     * @return array
+     */
+    private function getPropertyImports(ReflectionProperty $property)
+    {
+        $class = $property->getDeclaringClass();
+        $classImports = $this->getClassImports($class);
+        if (!method_exists($class, 'getTraits')) {
+            return $classImports;
+        }
+
+        $traitImports = array();
+
+        foreach ($class->getTraits() as $trait) {
+            if ($trait->hasProperty($property->getName())) {
+                $traitImports = array_merge($traitImports, $this->phpParser->parseClass($trait));
+            }
+        }
+
+        return array_merge($classImports, $traitImports);
+    }
+
+    /**
+     * Collects parsing metadata for a given class.
      *
      * @param \ReflectionClass $class
      */
